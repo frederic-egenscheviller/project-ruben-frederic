@@ -1,5 +1,9 @@
 # Guide d'utilisation : Docker Compose, Kubernetes et Ansible
 
+Membres du groupe :
+- Ruben SAILLY
+- Frédéric EGENSCHEVILLER
+
 ## Docker Compose
 
 Ce projet inclut un fichier `docker-compose.yml` qui permet de build les images et lancer les services.
