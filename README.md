@@ -11,8 +11,8 @@ Ce projet inclut un fichier `docker-compose.yml` qui permet de build les images 
 ### Commandes nécessaires au lancement du projet
 
 ```bash
-docker-compose up  # Démarre les services et build si images non présentes
-docker-compose down   # Arrête et supprime les conteneurs
+docker compose up  # Démarre les services et build si images non présentes
+docker compose down   # Arrête et supprime les conteneurs
 ```
 
 ### Description de ce qui a été mis en place
