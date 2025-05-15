@@ -1,0 +1,6 @@
+- name: Strategy A - Controller based backup
+  hosts: all
+  become: yes
+  roles:
+    - pg_backup_controller
+    - pg_restore_secondary

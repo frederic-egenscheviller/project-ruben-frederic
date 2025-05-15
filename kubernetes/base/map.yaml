@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: map
+data:
+  # kv format
+  POSTGRES_USER: "postgres"
+  POSTGRES_PASSWORD: "postgres"
+  POSTGRES_DB: "db"
+  POSTGRES_HOST_AUTH_METHOD: "trust"
+  #$actual-config-file$: "name.properties"
+
+  # file format
+  # name.properties: |
+  #  field=value1,value2

@@ -1,0 +1,14 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: seed
+spec:
+  template:
+    spec:
+      containers:
+        - name: seed
+          image: docker.io/library/voting-app-seed-kubernetes:latest
+          imagePullPolicy: Never
+      restartPolicy: Never
+  backoffLimit: 4
+  

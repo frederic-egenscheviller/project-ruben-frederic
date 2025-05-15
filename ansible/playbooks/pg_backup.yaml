@@ -1,0 +1,5 @@
+- name: PostgreSQL streamed backup
+  hosts: vm1
+  become: yes
+  roles:
+    - pg_backup_controller

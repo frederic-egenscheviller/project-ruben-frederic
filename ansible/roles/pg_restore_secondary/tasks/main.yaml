@@ -1,0 +1,25 @@
+- name: Drop existing schema on secondary
+  shell: |
+    PGPASSWORD="{{ pg_password }}" psql -U "{{ pg_username }}" -d postgres -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+  become_user: postgres
+  when: inventory_hostname == groups['all'][1]
+  ignore_errors: true
+
+- name: Copy dump to secondary
+  copy:
+    src: "{{ local_backup_dir }}/{{ backup_filename }}"
+    dest: "/tmp/{{ backup_filename }}"
+    mode: '0644'
+  when: inventory_hostname == groups['all'][1]
+
+- name: Restore dump on secondary
+  shell: |
+    PGPASSWORD="{{ pg_password }}" psql -U "{{ pg_username }}" -d postgres -f /tmp/{{ backup_filename }}
+  become_user: postgres
+  when: inventory_hostname == groups['all'][1]
+
+- name: Cleanup temp file
+  file:
+    path: "/tmp/{{ backup_filename }}"
+    state: absent
+  when: inventory_hostname == groups['all'][1]

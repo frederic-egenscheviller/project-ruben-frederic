@@ -1,0 +1,134 @@
+---
+- name: Ajouter la clé GPG du dépôt PostgreSQL
+  apt_key:
+    url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+    state: present
+  become: yes
+  become_user: root
+
+- name: Ajouter le dépôt PostgreSQL 15
+  apt_repository:
+    repo: "deb http://apt.postgresql.org/pub/repos/apt {{ ansible_distribution_release }}-pgdg main"
+    filename: 'pgdg'
+    state: present
+  become: yes
+  become_user: root
+
+- name: Mettre à jour le cache APT
+  apt:
+    update_cache: yes
+  become: yes
+  become_user: root
+
+- name: Installer PostgreSQL 15 et les paquets nécessaires
+  apt:
+    name:
+      - postgresql-15
+      - python3-psycopg2
+    state: present
+  become: yes
+  become_user: root
+
+- name: Start and enable PostgreSQL service
+  systemd:
+    name: postgresql@15-main
+    state: started
+    enabled: yes
+  become: yes
+  become_user: root
+
+- name: Create postgres database
+  postgresql_db:
+    name: postgres
+    state: present
+  become: yes
+  become_user: postgres
+
+- name: Create postgres user
+  postgresql_user:
+    name: "{{ pg_username }}"
+    password: "{{ pg_password }}"
+    state: present
+  become: yes
+  become_user: postgres
+
+- name: Grant all privileges to postgres user
+  postgresql_privs:
+    type: database
+    database: postgres
+    roles: "{{ pg_username }}"
+    privs: ALL
+    state: present
+  become: yes
+  become_user: postgres
+
+- name: Get pg_hba.conf path
+  postgresql_query:
+    query: "SHOW hba_file;"
+  register: pg_hba_result
+  become: yes
+  become_user: postgres
+
+- name: Debug pg_hba_result
+  debug:
+    var: pg_hba_result
+    verbosity: 1
+
+- name: Allow postgres user to connect from anywhere
+  postgresql_pg_hba:
+    dest: "{{ pg_hba_result.query_result[0].hba_file }}"
+    contype: host
+    databases: all
+    users: "{{ pg_username }}"
+    address: all
+    method: md5
+    state: present
+  become: yes
+  become_user: postgres
+  notify: restart postgresql
+
+- name: Set PostgreSQL listen address to all interfaces
+  postgresql_set:
+    name: listen_addresses
+    value: '0.0.0.0'
+  become: yes
+  become_user: postgres
+  notify: restart postgresql
+
+- name: Configure vm.vfs_cache_pressure parameter (persistent)
+  ansible.posix.sysctl:
+    name: vm.vfs_cache_pressure
+    value: '90'
+    state: present
+    sysctl_file: /etc/sysctl.d/90-vfs-cache-pressure.conf
+    reload: yes
+  become: yes
+  become_user: root
+
+- name: Configure PostgreSQL shared_buffers
+  postgresql_set:
+    name: shared_buffers
+    value: '256MB'
+  become: yes
+  become_user: postgres
+  notify: restart postgresql
+
+- name: Set shared_buffers percentage based on available memory
+  set_fact:
+    shared_buffers_percentage: "{{ 0.15 if ansible_memtotal_mb < 1024 else 0.25 }}"
+
+- name: Calculate shared_buffers value in MB
+  set_fact:
+    shared_buffers_mb: "{{ [16, (ansible_memtotal_mb * shared_buffers_percentage) | int] | max }}" # Ensure minimum of 16MB to run PostgreSQL
+
+- name: Configure PostgreSQL shared_buffers dynamically
+  postgresql_set:
+    name: shared_buffers
+    value: "{{ shared_buffers_mb }}MB"
+  become: yes
+  become_user: postgres
+  notify: restart postgresql
+
+- name: Display configured shared_buffers value
+  debug:
+    msg: "Configured shared_buffers to {{ shared_buffers_mb }}MB (minimum of 16MB or {{ shared_buffers_percentage * 100 }}% of {{ ansible_memtotal_mb }}MB RAM)"

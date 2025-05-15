@@ -1,0 +1,138 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    healthcheck:
+      test: ["CMD", "sh", "/healthchecks/redis.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    command: ["redis-server"]
+    networks:
+      - back-net
+    volumes:
+      - ./healthchecks/:/healthchecks/
+
+  db:
+    image: postgres:15-alpine
+    container_name: db
+    healthcheck:
+      test: ["CMD", "bash", "/healthchecks/postgres.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - ./healthchecks/:/healthchecks/
+      - db-data:/var/lib/postgresql/data
+    networks:
+      - back-net
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: "trust"
+
+  worker:
+    build:
+      context: "./worker"
+      dockerfile: Dockerfile
+      args:
+        TARGETARCH: amd64 #arm64
+        BUILDPLATFORM: linux/amd64 #linux/arm64
+    image: voting-app-worker:latest
+    container_name: worker
+    depends_on:
+      - redis
+      - db
+    networks:
+      - back-net
+
+  vote-1:
+    build:
+        context: "./vote"
+        dockerfile: Dockerfile
+    image: voting-app-vote:latest
+    container_name: "vote-1"
+    depends_on:
+      - redis
+      - db
+    networks:
+      - front-net
+      - back-net
+    healthcheck:
+      test: ["CMD", "sh", "/healthchecks/vote.sh"]
+      start_period: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - ./healthchecks/:/healthchecks/
+
+  vote-2:
+    image: voting-app-vote:latest
+    container_name: "vote-2"
+    depends_on:
+      - redis
+      - db
+    networks:
+      - front-net
+      - back-net
+    healthcheck:
+      test: ["CMD", "sh", "/healthchecks/vote.sh"]
+      start_period: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - ./healthchecks/:/healthchecks/
+
+  result:
+    build:
+        context: "./result"
+        dockerfile: Dockerfile
+    image: voting-app-result:latest
+    container_name: "result"
+    depends_on:
+      - db
+    networks:
+      - back-net
+      - front-net
+    ports:
+      - "4000:4000"
+    
+  seed:
+    container_name: "seed"
+    build:
+      context: "./seed-data"
+      dockerfile: Dockerfile
+    image: voting-app-seed:latest
+    depends_on:
+      db:
+        condition: service_healthy
+      nginx:
+        condition: service_started
+      vote-1:
+        condition: service_started
+      vote-2:
+        condition: service_started
+    networks:
+      - front-net
+
+  nginx:
+    build: "./nginx"
+    container_name: "nginx"
+    image: voting-app-nginx:latest
+    depends_on:
+      - vote-1
+      - vote-2
+    networks:
+      - front-net
+    ports:
+      - "8000:8000"
+
+networks:
+  front-net:
+    driver : bridge
+  back-net:
+    driver: bridge
+
+volumes:
+  db-data:
+    driver: local

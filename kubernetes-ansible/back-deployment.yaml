@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      volumes:
+        - name: healthcheck-scripts
+          emptyDir: {}
+        - name: local-scripts
+          hostPath:
+            path: /mnt/healthchecks
+            type: Directory
+      initContainers:
+        - name: init-redis-healthcheck
+          image: busybox:latest
+          command: ["sh", "-c", "cp /scripts/redis.sh /healthcheck-scripts/"]
+          volumeMounts:
+            - name: healthcheck-scripts
+              mountPath: /healthcheck-scripts
+            - name: local-scripts
+              mountPath: /scripts
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          command: ["redis-server"]
+          ports:
+            - containerPort: 6379
+          volumeMounts:
+            - name: healthcheck-scripts
+              mountPath: /healthcheck-scripts
+          livenessProbe:
+            exec:
+              command:
+                - "sh"
+                - "-c"
+                - "/healthcheck-scripts/redis.sh"
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - "sh"
+                - "-c"
+                - "/healthcheck-scripts/redis.sh"
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      containers:
+        - name: worker
+          image: docker.io/library/voting-app-worker:latest
+          imagePullPolicy: Never

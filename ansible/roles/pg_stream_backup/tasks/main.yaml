@@ -1,0 +1,26 @@
+- name: Set backup filename
+  set_fact:
+    backup_filename: "postgres_backup_{{ ansible_date_time.date }}_{{ ansible_date_time.time | replace(':', '-') }}.sql"
+
+- name: Ensure local backup directory exists
+  file:
+    path: "{{ local_backup_dir }}"
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+  become: no
+
+- name: Stream backup
+  shell: |
+    PGPASSWORD="{{ pg_password }}" pg_dump -U "{{ pg_username }}" -h localhost postgres
+  register: pg_dump_output
+  become_user: postgres
+  no_log: true
+
+- name: Save streamed backup
+  copy:
+    content: "{{ pg_dump_output.stdout }}"
+    dest: "{{ local_backup_dir }}/{{ backup_filename }}"
+    mode: '0644'
+  delegate_to: localhost
+  become: no

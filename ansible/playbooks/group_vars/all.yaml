@@ -1,0 +1,3 @@
+pg_username: postgres
+pg_password: postgres
+local_backup_dir: ../backups

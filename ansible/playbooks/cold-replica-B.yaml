@@ -1,0 +1,5 @@
+- name: Strategy B - Direct dump and restore
+  hosts: all
+  become: yes
+  roles:
+    - pg_direct_replication
